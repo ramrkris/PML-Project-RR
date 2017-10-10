@@ -1,0 +1,92 @@
+---
+title: "Practical Machine Learning- Project"
+author: "Ram Ramakrishnan"
+date: "October 9, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(caret); library(rattle); library(rpart);library(rpart.plot);library(randomForest);library(dplyr)
+```
+
+## Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project,the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants and predict outcome using machine learning algorithm
+
+## Datasets
+The training data for this project are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+
+## Data cleaning
+As a first step, we load the data and observe it. We notice that several columns have NA values. So as first step, we drop all columns that have NA.
+
+```{r}
+#LOAD DATASETS
+train <- read.csv("pml-training.csv")
+test <- read.csv("pml-testing.csv")
+
+# CLEAN UP COLUMNS WITH NA
+train <- train[, colSums(is.na(train)) == 0]
+test <- test[, colSums(is.na(test)) == 0]
+```
+
+
+As a next step, we create training and validation datsets. Once created, we observe that several columns (that start with kurtosis, skewness, min, max, amplitude) have missing values. This indicates the different measurements have missing values. We clean up columns with missing values. In addition, we also clear some upfront columns such as index number, user name and time stamps
+
+
+```{r}
+#CREATE TRAINING AND VALIDATION DATASETS
+set.seed(1000) 
+inTrain <- createDataPartition(train$classe, p = 0.6, list = FALSE)
+training <- train[inTrain, ]
+valid <- train[-inTrain, ]
+
+# REMOVE UNWANTED COLUMNS WITH SEVERAL MISSING VALUES AND REMOVE UPFRONT COLUMNS LIKE USER NAME AND TIMESTAMP
+training <- training %>% select(-starts_with("kurtosis_"),-starts_with("skewness"),-starts_with("min"),-starts_with("max"),-starts_with("amplitude"),-X,-user_name,-starts_with("raw"),-cvtd_timestamp)
+dim(training)
+
+valid <- valid %>% select(-starts_with("kurtosis_"),-starts_with("skewness"),-starts_with("min"),-starts_with("max"),-starts_with("amplitude"),-X,-user_name,-starts_with("raw"),-cvtd_timestamp)
+dim(valid)
+
+```
+
+
+## Running random forest
+We run a random forest algorithm on the dataset.  
+
+```{r, results='hide'}
+#Random forecast algorithm
+modrf <- train(classe~.,method = "rf",data=training, trControl = trainControl(method = "cv",number=5))
+```
+
+We use the fitted model to predict accuracy of the validation set and observe a high accuracy and low out of sample error!!
+
+```{r}
+#Predict using validation dataset and check accuracy
+modrf$finalModel
+predrf <- predict(modrf,valid)
+confusionMatrix(predrf,valid$classe)
+```
+
+## Running Generalized boosted regression model
+We run a generalized boosted model using the gbm package.
+
+```{r, results='hide', include=FALSE}
+#GBM model
+modgbm <- train(classe~.,method = "gbm",data=training,trControl = trainControl(method = "cv",number=5))
+```
+
+We use the fitted model to predict accuracy of the validation set and observe a high accuracy and low out of sample error. **The random forest results are used given better accuracy**.
+
+```{r}
+#Predict using validation dataset and check accuracy
+modgbm$finalModel
+predgbm <- predict(modgbm,valid)
+confusionMatrix(predgbm,valid$classe)
+```
